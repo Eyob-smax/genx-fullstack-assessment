@@ -20,20 +20,27 @@ export async function GET(request: NextRequest) {
   const tokens = report.split(" ");
   const encoder = new TextEncoder();
 
+  // Set when the client aborts (fetch AbortController) or the consumer cancels the
+  // body, so we stop generating tokens nobody will read.
+  let cancelled = false;
+
   const stream = new ReadableStream({
     async start(controller) {
       // Initial model cold-start delay
       await new Promise((r) => setTimeout(r, 250));
 
       for (const word of tokens) {
-        if (request.signal.aborted) {
-          controller.close();
+        if (cancelled || request.signal.aborted) {
+          if (!cancelled) controller.close();
           return;
         }
         controller.enqueue(encoder.encode(word + " "));
         await new Promise((r) => setTimeout(r, 45));
       }
-      controller.close();
+      if (!cancelled) controller.close();
+    },
+    cancel() {
+      cancelled = true;
     },
   });
 

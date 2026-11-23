@@ -1,48 +1,43 @@
 "use client";
 
-import React from "react";
+import React, { memo } from "react";
+import { counterStyle, useCommitCounter } from "@/lib/useCommitCounter";
 
 /**
  * Simulates an expensive markdown / syntax highlighting component.
- * Intentionally un-memoized in starter code so parent re-renders cause noticeable lag.
+ *
+ * It no longer receives `summaryText`: it only depends on `rawPayload`, and memo()
+ * skips it entirely unless that string changes (i.e. on selection change, never per
+ * streamed token).
  */
-export function HeavyPayloadFormatter({ rawPayload, summaryText }: { rawPayload: string; summaryText: string }) {
-  // Simulate ~12ms of synchronous formatting work per render
+export const HeavyPayloadFormatter = memo(function HeavyPayloadFormatter({ rawPayload }: { rawPayload: string }) {
+  // Simulate ~12ms of synchronous formatting work per render.
+  // (The starter rendered this loop's counter as `data-checksum`. That value depends
+  // on timing, so server and client HTML never matched -> hydration warning. It is
+  // no longer rendered.)
   const start = performance.now();
-  let checksum = 0;
   while (performance.now() - start < 12) {
-    checksum = (checksum + 1) % 1000;
+    // busy-wait
   }
 
+  const counterRef = useCommitCounter("Payload formatter");
+
   return (
-    <div data-checksum={checksum} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-      <div
+    <details open>
+      <summary style={{ cursor: "pointer", color: "#94a3b8", fontSize: "13px" }}>
+        Raw Telemetry Payload <span ref={counterRef} data-testid="formatter-renders" style={counterStyle} />
+      </summary>
+      <pre
         style={{
-          background: "#1e293b",
-          padding: "14px",
-          borderRadius: "8px",
-          border: "1px solid #334155",
-          whiteSpace: "pre-wrap",
-          lineHeight: 1.55,
-          minHeight: "180px",
+          background: "#020617",
+          padding: "12px",
+          borderRadius: "6px",
+          fontSize: "12px",
+          overflowX: "auto",
         }}
       >
-        {summaryText || "Select an event to generate an AI incident analysis..."}
-      </div>
-      <details open>
-        <summary style={{ cursor: "pointer", color: "#94a3b8", fontSize: "13px" }}>Raw Telemetry Payload</summary>
-        <pre
-          style={{
-            background: "#020617",
-            padding: "12px",
-            borderRadius: "6px",
-            fontSize: "12px",
-            overflowX: "auto",
-          }}
-        >
-          {rawPayload}
-        </pre>
-      </details>
-    </div>
+        {rawPayload}
+      </pre>
+    </details>
   );
-}
+});

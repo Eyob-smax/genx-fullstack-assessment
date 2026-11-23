@@ -30,3 +30,30 @@ pytest -v -s
 ## Constraints
 - **No external infrastructure:** Keep the solution self-contained using Python and SQLite (do not add Redis, Celery, RabbitMQ, or PostgreSQL).
 - Complete `DECISIONS.md` explaining your root-cause diagnosis and architectural choices.
+
+---
+
+## Solution overview
+
+See **[DECISIONS.md](DECISIONS.md)** for the full diagnosis and trade-offs.
+
+```
+app/
+  main.py        FastAPI app + lifespan: validate → redact PII → idempotent insert → 202
+  database.py    single long-lived SQLite connection (WAL) on a dedicated writer thread,
+                 UNIQUE idempotency key, atomic claim-with-lease for delivery
+  worker.py      DeliveryService: asyncio.Queue + bounded workers, process-pool fingerprinting,
+                 retries with exponential backoff + jitter, sweeper for crash recovery
+  downstream.py  shared httpx client, retryable/non-retryable error classification
+  processor.py   redact_pii (cheap, inline) / compute_fingerprint (CPU, process pool)
+tests/
+  test_burst_load.py                 provided chaos harness (unchanged)
+  test_idempotency_and_delivery.py   races, retries, dead-letter, crash recovery, HTTP contract
+```
+
+Run everything with `pytest -v -s`. Optional tuning via env vars: `CPU_POOL_WORKERS`
+(default `cpu_count // 2`), `DELIVERY_CONCURRENCY` (16), `DELIVERY_MAX_ATTEMPTS` (12),
+`DELIVERY_BASE_BACKOFF` (0.25 s), `DELIVERY_MAX_BACKOFF` (30 s).
+
+> Note: the SQLite build must support `RETURNING` (SQLite ≥ 3.35, bundled with all
+> current CPython 3.11+ builds).

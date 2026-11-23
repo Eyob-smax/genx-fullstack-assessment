@@ -24,3 +24,34 @@ Open `http://localhost:3000` in your browser.
 ## Constraints
 - **No external state or data-fetching libraries:** Do not install Zustand, Redux, Jotai, TanStack Query, or SWR. Solve state and cancellation using native React and Next.js App Router primitives.
 - Complete `DECISIONS.md` before submitting.
+
+---
+
+## Solution overview
+
+See **[DECISIONS.md](DECISIONS.md)** for the diagnosis and design rationale.
+
+```
+src/app/page.tsx                    Server Component: parses ?search/&severity, queries events, renders shell
+src/lib/filters.ts                  shared pure filter parsing / query-string building
+src/lib/events.ts                   server-only event query (shared with /api/events)
+src/components/SelectionContext.tsx selected-event value + stable setter (split contexts)
+src/components/FilterBar.tsx        URL-driven filters: debounced search, router.push in a transition
+src/components/EventList.tsx        memoized rows
+src/components/SummaryPanel.tsx     selection → <SummaryStream key=id> + memoized payload formatter
+src/components/SummaryStream.tsx    leaf that owns the stream, AbortController per effect run
+src/lib/useCommitCounter.ts         built-in render counters (DOM-only, never cause renders)
+scripts/verify.cjs                  Playwright check of all four acceptance criteria
+```
+
+### Verifying
+
+```bash
+npm run build && npm start          # or npm run dev
+# in another terminal:
+npx playwright install chromium     # once (or set CHROME_PATH=/path/to/chrome)
+npm run verify                      # BASE=http://localhost:3000 by default
+```
+
+The render counters are visible in the UI. Select an event and watch them: only the
+"Summary renders" counter moves while tokens stream.

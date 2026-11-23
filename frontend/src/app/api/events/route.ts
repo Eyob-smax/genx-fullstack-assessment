@@ -1,27 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ALL_EVENTS } from "@/lib/mockData";
+import { parseFilters } from "@/lib/filters";
+import { queryEvents } from "@/lib/events";
 
+/**
+ * Public JSON endpoint (kept for external consumers). The dashboard page itself no
+ * longer calls this: it reads events directly in a Server Component, which avoids a
+ * redundant server -> own-API -> server hop.
+ */
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const search = (searchParams.get("search") || "").toLowerCase().trim();
-  const severity = searchParams.get("severity") || "all";
+  const filters = parseFilters(request.nextUrl.searchParams);
 
   // Simulate realistic network jitter (150ms - 550ms) so out-of-order responses happen naturally
   const delay = 150 + Math.floor(Math.random() * 400);
   await new Promise((r) => setTimeout(r, delay));
 
-  const filtered = ALL_EVENTS.filter((evt) => {
-    const matchesSeverity = severity === "all" || evt.severity === severity;
-    const matchesSearch =
-      !search ||
-      evt.title.toLowerCase().includes(search) ||
-      evt.service.toLowerCase().includes(search) ||
-      evt.id.toLowerCase().includes(search);
-    return matchesSeverity && matchesSearch;
-  });
-
-  return NextResponse.json({
-    events: filtered,
-    total: filtered.length,
-  });
+  const filtered = queryEvents(filters);
+  return NextResponse.json({ events: filtered, total: filtered.length });
 }
